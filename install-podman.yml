@@ -1,0 +1,37 @@
+- hosts: all
+  name: install_podman
+  tasks:
+    - name: Update all packages
+      become: yes
+      apt:
+        upgrade: dist
+        update_cache: yes
+        cache_valid_time: 3600
+    - name: Check if a reboot is needed on all servers
+      register: reboot_required_file
+      stat: path=/var/run/reboot-required get_md5=no
+    - name: Reboot the box if kernel updated
+      become: yes
+      reboot:
+        msg: "Reboot initiated by Ansible for kernel updates"
+        connect_timeout: 5
+        reboot_timeout: 300
+        pre_reboot_delay: 0
+        post_reboot_delay: 30
+        test_command: uptime
+      when: reboot_required_file.stat.exists
+    - name: Install podman
+      become: yes
+      apt:
+        update_cache: yes
+        state: latest
+        pkg:
+          - podman
+          - runc
+          - buildah
+          - skopeo
+    - name: prepare podman socket
+      shell: systemctl --user enable --now podman.socket
+    - name: prepare podman socket at login
+      become: yes
+      shell: loginctl enable-linger $USER
